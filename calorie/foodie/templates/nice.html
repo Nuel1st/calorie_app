@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Set Password Form</title>
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <link rel="stylesheet" type="text/css" href="{% static 'css/loading.css' %}">
+      </head>
+<body>
+    <div id="loading-indicator">
+        <!--loading indicator -->
+        Loading...
+      </div>
+    
+      <form id="set-password-form" method="post" action="{% url 'set_password' %}">
+        {% csrf_token %}
+        <input type="text" name="username" placeholder="Username">
+        <input type="password" name="old_password" placeholder="Old Password">
+        <input type="password" name="new_password" placeholder="New Password">
+        <button id="submit-btn" type="submit">Submit</button>
+      </form>
+    
+      <script>
+        $(document).ready(function() {
+          $('#set-password-form').submit(function() {
+            // Show the loading indicator
+            $('#loading-indicator').show();
+    
+            // Disable the submit button to prevent multiple form submissions
+            $('#submit-btn').prop('disabled', true);
+          });
+        });
+      </script>
+</body>
+</html>
+
+import requests
+from django.shortcuts import render
+from .forms import InputForm
+
+def fetch_data(username):
+    # Fetch data from the URL
+    url = f"http://example.com/api/data/{username}"
+    response = requests.get(url)
+    data = response.json()
+    return data
+
+def update_user_profile(user_profile_data, userprofileurl):
+    # Update user profile using API
+    response = requests.post(userprofileurl, json=user_profile_data)
+    return response
+
+def user_profile(request):
+    session_id = request.GET.get('session_id')
+    api_url = "https://100093.pythonanywhere.com/api/userinfo/"
+
+    myobj = {'session_id': session_id}
+    response = requests.post(api_url, data=myobj)
+    data = response.json()
+
+    user_profile = data['userinfo']
+    username = user_profile['username']
+
+    # Fetching data from API
+    res = fetch_data(username)
+    ls = [key for d in res['data'] for key in d]
+    ls = set(ls)
+    main_data = {}
+    for key in ls:
+        l = [d[key] for d in res['data'] if key in d]
+        main_data[key] = l[0]
+
+    context = {}
+    context['user_data'] = main_data
+    context['user_profile'] = user_profile
+    context['form'] = InputForm()
+    context['session_id'] = session_id
+    context['show_loading'] = True
+
+    if request.method == 'POST':
+        user_form = InputForm(request.POST)
+        if user_form.is_valid():
+            first_name = user_form.cleaned_data['first_name']
+            last_name = user_form.cleaned_data['last_name']
+            phone_number = user_form.cleaned_data['phone_number']
+            email_address = user_form.cleaned_data['email_address']
+            address = user_form.cleaned_data['address']
+            pincode = user_form.cleaned_data['pincode']
+            city = user_form.cleaned_data['city']
+            country = user_form.cleaned_data['country']
+            native_language = user_form.cleaned_data['native_language']
+            vision = user_form.cleaned_data['vision']
+            
+            user_profile_data = {
+                "username": username,
+                "language_preferences": [],
+            }
+            
+            if first_name:
+                user_profile_data["first_name"] = first_name
+            if last_name:
+                user_profile_data["last_name"] = last_name
+            if phone_number:
+                user_profile_data["phone"] = phone_number
+            if email_address:
+                user_profile_data["email"] = email_address
+            if address:
+                user_profile_data["address"] = address
+            if pincode:
+                user_profile_data["zip_code"] = pincode
+            if city:
+                user_profile_data["city"] = city
+            if country:
+                user_profile_data["country"] = country
+            if native_language:
+                user_profile_data["native_language"] = native_language
+            if vision:
+                user_profile_data["vision"] = vision
+
+            userprofileurl = "https://100014.pythonanywhere.com/api/profile_update/"
+            response = update_user_profile(user_profile_data, userprofileurl)
+            
+            if response.status_code == 200:
+                context['success'] = 'User Info data updated successfully.'
+            else:
+                context['error'] = 'Error updating user info.'
+
+    return render(request, 'index.html', {'context': context})
